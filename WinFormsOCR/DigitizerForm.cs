@@ -48,7 +48,6 @@ namespace WinFormsOCR
                 try
                 {
                     //Perform OCR operation
-                    //TODO: Make it show that it's loading or something else
                     TesseractEngine ocrengine = new("tessdata", ((LanguageItem)LinguagensCbx.SelectedItem).Name, EngineMode.Default);
                     Pix img = Pix.LoadFromFile(path);
                     Page scanResult = ocrengine.Process(img);
