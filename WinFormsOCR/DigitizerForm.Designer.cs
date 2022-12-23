@@ -137,7 +137,7 @@
             this.EscanearBtn.TabIndex = 2;
             this.EscanearBtn.Text = "Escanear";
             this.EscanearBtn.UseVisualStyleBackColor = true;
-            this.EscanearBtn.Click += new System.EventHandler(this.EscanearBtn_Click);
+            this.EscanearBtn.Click += new System.EventHandler(this.ScanImages);
             // 
             // ImagensGroupBox
             // 
@@ -215,7 +215,7 @@
             this.button1.TabIndex = 2;
             this.button1.Text = "Selecionar imagens...";
             this.button1.UseVisualStyleBackColor = true;
-            this.button1.Click += new System.EventHandler(this.BuscarImagemBtn_Click);
+            this.button1.Click += new System.EventHandler(this.AddImagem_Button_Click);
             // 
             // AddImagensBtn
             // 
@@ -229,7 +229,7 @@
             this.AddImagensBtn.Text = "Adicionar imagens...";
             this.AddImagensBtn.UseVisualStyleBackColor = true;
             this.AddImagensBtn.Visible = false;
-            this.AddImagensBtn.Click += new System.EventHandler(this.BuscarImagemBtn_Click);
+            this.AddImagensBtn.Click += new System.EventHandler(this.AddImagem_Button_Click);
             // 
             // groupBox1
             // 

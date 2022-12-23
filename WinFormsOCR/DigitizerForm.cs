@@ -18,12 +18,12 @@ namespace WinFormsOCR
             toolStripComboBox1.ComboBox.MouseWheel += ChangeSize;
         }
 
-        private void ListItem_RemoveButtonClicked(object? sender, EventArgs e)
+        private void RemoveImageButton(object? sender, EventArgs e)
         {
             Control? ctrl = (Control?)sender;
             if (ctrl != null)
             {
-                var listItem = (SelectionItem)ctrl.Parent;
+                SelectionItem listItem = (SelectionItem)ctrl.Parent;
                 selectionItems.RemoveItem(listItem);
             }
             if (selectionItems.Count == 0)
@@ -35,11 +35,12 @@ namespace WinFormsOCR
             }
         }
 
-        private void EscanearBtn_Click(object sender, EventArgs e)
+        private void ScanImages(object sender, EventArgs e)
         {
             resultadosImageList.Images.Clear();
             listView1.Items.Clear();
             ResultadoRichTextBox.Clear();
+            previousItem = -1;
 
             for (int i = 0; i < selectionItems.ItemPaths.Length; i++)
             {
@@ -47,7 +48,8 @@ namespace WinFormsOCR
                 try
                 {
                     //Perform OCR operation
-                    TesseractEngine ocrengine = new TesseractEngine("tessdata", ((LanguageItem)LinguagensCbx.SelectedItem).Name, EngineMode.Default);
+                    //TODO: Make it show that it's loading or something else
+                    TesseractEngine ocrengine = new("tessdata", ((LanguageItem)LinguagensCbx.SelectedItem).Name, EngineMode.Default);
                     Pix img = Pix.LoadFromFile(path);
                     Page scanResult = ocrengine.Process(img);
                     string resultText = scanResult.GetText();
@@ -85,6 +87,7 @@ namespace WinFormsOCR
             MainTabControl.SelectedTab = ResultadosTabPage;
             if (listView1.Items.Count > 0)
             {
+                Text = listView1.Items.Count + " ite" + (listView1.Items.Count > 1 ? "ns" : "m") + " escaneado" + (listView1.Items.Count > 1 ? "s" : "");
                 listView1.Items[0].Selected = true;
                 splitContainer1.Enabled = true;
                 SalvarArquivoBtn.Enabled = true;
@@ -96,14 +99,7 @@ namespace WinFormsOCR
 
         private void tableLayoutPanel1_DragEnter(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                e.Effect = DragDropEffects.Copy;
-            }
-            else
-            {
-                e.Effect = DragDropEffects.None;
-            }
+            e.Effect = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
 
         }
 
@@ -126,14 +122,14 @@ namespace WinFormsOCR
                 EscanearBtn.Enabled = true;
             }
 
-            var newItem = new SelectionItem(path);
-            newItem.RemoveButtonClicked += ListItem_RemoveButtonClicked;
+            SelectionItem newItem = new(path);
+            newItem.RemoveButtonClicked += RemoveImageButton;
             selectionItems.AddItem(newItem);
         }
 
-        private void BuscarImagemBtn_Click(object sender, EventArgs e)
+        public void AddImagem_Button_Click(object sender, EventArgs e)
         {
-            OpenFileDialog ofd = new OpenFileDialog()
+            OpenFileDialog ofd = new()
             {
                 Title = "Importar arquivo de imagem",
                 Filter = "Arquivos de imagem conhecidos|*.jpg;*.png;*.bmp|Todos os arquivos|*.*",
@@ -150,31 +146,130 @@ namespace WinFormsOCR
 
         #endregion
 
+        #region Viewing items 
+
+        private int previousItem = -1;
+
         private void listView1_SelectedIndexChanged(object sender, EventArgs e)
         {
+            //If the previous item exists, save its custom RTF to be the current textbox RTF
+            if (previousItem != -1)
+            {
+                ((ResultListViewItem)listView1.Items[previousItem]).CustomRTF = ResultadoRichTextBox.Rtf;
+            }
+            //If an item has been selected...
             if (listView1.SelectedItems.Count > 0)
             {
-                var selectedItem = (ResultListViewItem)listView1.SelectedItems[0];
-                ResultadoRichTextBox.Text = selectedItem.ScanResult;
+                //Set the new selected item as the previous item and get it
+                previousItem = listView1.SelectedIndices[0];
+                ResultListViewItem selectedItem = (ResultListViewItem)listView1.SelectedItems[0];
+                //If the selected item's custom RTF doesn't exist yet
+                if (selectedItem.CustomRTF == string.Empty)
+                {
+                    //Initialize it, set the textbox's text to be the bare
+                    //unformatted scan result, which will be converted by
+                    //the control as RTF which can later be extracted from
+                    //the .Rtf property in the first step when switching
+                    //from this onto another item, creating custom RTF which
+                    //will be loaded in the else statement of this condition
+                    ResultadoRichTextBox.Text = selectedItem.ScanResult;
+                }
+                else
+                {
+                    //Load custom RTF if it exists
+                    ResultadoRichTextBox.Rtf = selectedItem.CustomRTF;
+                }
             }
         }
 
-        private void SalvarArquivoBtn_Click(object sender, EventArgs e)
+        #endregion
+
+        #region Saving files
+
+        public enum SaveFormats { TXT, RTF }
+
+        public static SaveFormats GetSaveFormat(string path)
         {
-            SaveFile saveFile = new();
-            if (saveFile.ShowDialog() == DialogResult.OK)
+            return path.ToLower().EndsWith(".txt") ? SaveFormats.TXT : SaveFormats.RTF;
+        }
+
+        public static string GetAppendedPath(string path, int appendedIndex)
+        {
+            string suffix = "";
+            switch (GetSaveFormat(path))
             {
-                //TODO: Implement saving
-                throw new NotImplementedException();
+                case SaveFormats.TXT:
+                    suffix = ".txt";
+                    break;
+                case SaveFormats.RTF:
+                    suffix = ".rtf";
+                    break;
+            }
+
+            string prefix = path[..^suffix.Length];
+            return prefix + " (" + appendedIndex + ")" + suffix;
+        }
+
+        public void SalvarArquivoBtn_Click(object sender, EventArgs e)
+        {
+            if (listView1.Items.Count > 0)
+            {
+                //Save the currently selected item index for later
+                int currentIndex = listView1.SelectedIndices[0];
+
+                //Actually save the file
+                SaveFileDialog sfd = new()
+                {
+                    Title = "Salvar como...",
+                    Filter = "Arquivos de Texto (*.txt)|*.txt|Arquivos RTF (*.rtf)|*.rtf"
+                };
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    //Get all path names
+                    string[] savePathNames = new string[listView1.Items.Count];
+                    if (listView1.Items.Count == 1)
+                    {
+                        savePathNames[0] = sfd.FileName;
+                    }
+                    else
+                    {
+                        for (int i = 0; i < listView1.Items.Count; i++)
+                        {
+                            savePathNames[i] = GetAppendedPath(sfd.FileName, i + 1);
+                        }
+                    }
+
+                    //Save files according to format
+                    switch (GetSaveFormat(sfd.FileName))
+                    {
+                        case SaveFormats.TXT:
+                            for (int i = 0; i < listView1.Items.Count; i++)
+                            {
+                                listView1.Items[i].Selected = true;
+                                File.WriteAllLines(savePathNames[i], ResultadoRichTextBox.Lines);
+                            }
+                            break;
+                        case SaveFormats.RTF:
+                            for (int i = 0; i < listView1.Items.Count; i++)
+                            {
+                                listView1.Items[i].Selected = true;
+                                File.WriteAllText(savePathNames[i], ((ResultListViewItem)listView1.Items[i]).CustomRTF);
+                            }
+                            break;
+                    }
+                }
+                //Set currently selected item as the previously selected item
+                listView1.Items[currentIndex].Selected = true;
             }
         }
-        
-        //TODO: Stopped here! Next need to make RTF styles save themselves between changing items in the ListView
+
+        #endregion
+
         #region RichTextBox style editing
 
         private void toolStripButton1_Click(object sender, EventArgs e)
         {
-            ChangeFont(FontStyle.Bold);          
+            ChangeFont(FontStyle.Bold);
         }
 
         private void toolStripButton2_Click(object sender, EventArgs e)
@@ -244,7 +339,8 @@ namespace WinFormsOCR
                 {
                     toolStripComboBox1.SelectedIndex++;
                 }
-            } catch { }
+            }
+            catch { }
         }
 
         public void ChangeAlignment(HorizontalAlignment newAligment)
@@ -252,8 +348,8 @@ namespace WinFormsOCR
             ResultadoRichTextBox.SelectionAlignment = newAligment;
             RefreshAlignmentButtons();
         }
-        
-        void RefreshFontButtons()
+
+        private void RefreshFontButtons()
         {
             toolStripButton1.Checked = ResultadoRichTextBox.SelectionFont.Bold;
             toolStripButton2.Checked = ResultadoRichTextBox.SelectionFont.Italic;
@@ -261,22 +357,21 @@ namespace WinFormsOCR
             toolStripButton4.Checked = ResultadoRichTextBox.SelectionFont.Strikeout;
         }
 
-        void RefreshSize()
+        private void RefreshSize()
         {
             IgnoreUpdate = true;
             toolStripComboBox1.Text = ResultadoRichTextBox.SelectionFont.Size.ToString();
             IgnoreUpdate = false;
         }
 
-        void RefreshAlignmentButtons()
+        private void RefreshAlignmentButtons()
         {
             toolStripButton6.Checked = ResultadoRichTextBox.SelectionAlignment == HorizontalAlignment.Left;
             toolStripButton7.Checked = ResultadoRichTextBox.SelectionAlignment == HorizontalAlignment.Center;
             toolStripButton8.Checked = ResultadoRichTextBox.SelectionAlignment == HorizontalAlignment.Right;
         }
 
-
-        bool IgnoreUpdate = false;
+        private bool IgnoreUpdate = false;
 
         private void toolStripComboBox1_TextUpdate(object sender, EventArgs e)
         {
@@ -286,7 +381,7 @@ namespace WinFormsOCR
                 try
                 {
                     newSize = Convert.ToSingle(toolStripComboBox1.Text);
-                    ResultadoRichTextBox.SelectionFont = new Font(ResultadoRichTextBox.SelectionFont.FontFamily, newSize,ResultadoRichTextBox.SelectionFont.Style);
+                    ResultadoRichTextBox.SelectionFont = new Font(ResultadoRichTextBox.SelectionFont.FontFamily, newSize, ResultadoRichTextBox.SelectionFont.Style);
                 }
                 catch
                 {
@@ -294,7 +389,7 @@ namespace WinFormsOCR
                 }
             }
         }
-        
+
 
         #endregion
     }
@@ -309,10 +404,10 @@ namespace WinFormsOCR
         {
             get
             {
-                string[] result = new string[this.Count];
-                for (int i = 0; i < this.Count; i++)
+                string[] result = new string[Count];
+                for (int i = 0; i < Count; i++)
                 {
-                    var selectionitem = (SelectionItem)this[i];
+                    SelectionItem selectionitem = this[i];
                     result[i] = selectionitem.SelectionPath;
                 }
                 return result;
@@ -332,7 +427,7 @@ namespace WinFormsOCR
         public void AddItem(SelectionItem item)
         {
             AssociatedPanel.Controls.Add(item);
-            this.Add(item);
+            Add(item);
             OnListUpdate();
         }
 
@@ -342,7 +437,7 @@ namespace WinFormsOCR
         public void RemoveItem(SelectionItem item)
         {
             AssociatedPanel.Controls.Remove(item);
-            this.Remove(item);
+            Remove(item);
             OnListUpdate();
         }
 
@@ -352,7 +447,7 @@ namespace WinFormsOCR
         public void RemoveItemAt(int index)
         {
             AssociatedPanel.Controls.RemoveAt(index);
-            this.RemoveAt(index);
+            RemoveAt(index);
             OnListUpdate();
         }
 
@@ -372,9 +467,9 @@ namespace WinFormsOCR
         public string SelectionPath { get; set; }
         private readonly int ItemHeight = 30;
 
-        private PictureBox Icon;
-        private Label FilePathLabel;
-        private Button RemoveButton;
+        private readonly PictureBox Icon;
+        private readonly Label FilePathLabel;
+        private readonly Button RemoveButton;
 
         public SelectionItem(string selectionPath)
         {
@@ -382,19 +477,19 @@ namespace WinFormsOCR
             SelectionPath = selectionPath;
 
             //Set up tablelayoutpanel
-            this.ColumnCount = 3;
-            this.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            this.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            this.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            ColumnCount = 3;
+            ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-            this.RowCount = 1;
-            this.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            RowCount = 1;
+            RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            this.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-            this.AutoSize = true;
-            this.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
-            this.CellBorderStyle = TableLayoutPanelCellBorderStyle.Single;
+            CellBorderStyle = TableLayoutPanelCellBorderStyle.Single;
 
             //Set up Button
             RemoveButton = new()
@@ -405,7 +500,7 @@ namespace WinFormsOCR
                 Anchor = AnchorStyles.None
             };
             RemoveButton.Click += RemoveButton_Click;
-            this.Controls.Add(RemoveButton, 2, 0);
+            Controls.Add(RemoveButton, 2, 0);
 
             //Set up Label
             FilePathLabel = new()
@@ -415,29 +510,27 @@ namespace WinFormsOCR
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft
             };
-            this.Controls.Add(FilePathLabel, 1, 0);
+            Controls.Add(FilePathLabel, 1, 0);
 
             //Set up icon
             Icon = new()
             {
                 Image = SelectionImage,
                 BackColor = Color.LightGray,
-                Width = this.ItemHeight,
-                Height = this.ItemHeight,
+                Width = ItemHeight,
+                Height = ItemHeight,
                 Dock = DockStyle.Fill,
                 Margin = Padding.Empty,
                 SizeMode = PictureBoxSizeMode.Zoom
             };
-            this.Controls.Add(Icon, 0, 0);
+            Controls.Add(Icon, 0, 0);
 
 
         }
 
         public override Size GetPreferredSize(Size proposedSize)
         {
-            //return base.GetPreferredSize(proposedSize);
-            return new Size(Parent.ClientRectangle.Width - (Parent.Padding.Left + Parent.Padding.Right) - (this.Margin.Left + this.Margin.Right) - 3, ItemHeight);
-            //return new Size(Parent.Width, ItemHeight);
+            return new Size(Parent.ClientRectangle.Width - (Parent.Padding.Left + Parent.Padding.Right) - (Margin.Left + Margin.Right) - 3, ItemHeight);
         }
 
         private void RemoveButton_Click(object? sender, EventArgs e)
@@ -472,6 +565,7 @@ namespace WinFormsOCR
 
     public class ResultListViewItem : ListViewItem
     {
-        public string ScanResult { get; set; } = "";
+        public string ScanResult { get; set; } = string.Empty;
+        public string CustomRTF { get; set; } = string.Empty;
     }
 }
