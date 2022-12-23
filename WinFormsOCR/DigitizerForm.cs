@@ -48,7 +48,6 @@ namespace WinFormsOCR
                 try
                 {
                     //Perform OCR operation
-                    //TODO: Make it show that it's loading or something else
                     TesseractEngine ocrengine = new("tessdata", ((LanguageItem)LinguagensCbx.SelectedItem).Name, EngineMode.Default);
                     Pix img = Pix.LoadFromFile(path);
                     Page scanResult = ocrengine.Process(img);
@@ -62,7 +61,7 @@ namespace WinFormsOCR
                     }
                     catch
                     {
-                        Image b = new Bitmap(resultadosImageList.ImageSize.Width, resultadosImageList.ImageSize.Height); //TODO: Change size later
+                        Image b = new Bitmap(resultadosImageList.ImageSize.Width, resultadosImageList.ImageSize.Height);
                         Graphics g = Graphics.FromImage(b);
                         g.FillRectangle(Brushes.DarkGray, 0, 0, 32, 32);
                         resultadosImageList.Images.Add(b);

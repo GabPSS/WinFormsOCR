@@ -133,7 +133,6 @@ namespace WinFormsOCR
 
         private void sobreOProgramaToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            //TODO: Implement about form
             throw new NotImplementedException();
         }
 
