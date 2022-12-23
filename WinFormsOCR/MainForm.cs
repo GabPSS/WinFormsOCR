@@ -125,5 +125,49 @@ namespace WinFormsOCR
         {
             RequestChangeSize(false);
         }
+
+        private void fecharToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Close();
+        }
+
+        private void sobreOProgramaToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            //TODO: Implement about form
+            throw new NotImplementedException();
+        }
+
+        private void salvarComoToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            RequestSaveFile();
+        }
+
+        private void RequestSaveFile()
+        {
+            DigitizerForm form;
+            try
+            {
+                form = GetOpenDigitizerForm();
+                form.SalvarArquivoBtn_Click(form,EventArgs.Empty);
+            }
+            catch (NoOpenFormException)
+            {
+                return;
+            }
+        }
+
+        private void importarImagensToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            DigitizerForm form;
+            try
+            {
+                form = GetOpenDigitizerForm();
+                form.AddImagem_Button_Click(form, EventArgs.Empty);
+            }
+            catch (NoOpenFormException)
+            {
+                return;
+            }
+        }
     }
 }
